@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">将棋トレーナー</string>
+    <string name="title_activity_main">将棋トレーナー</string>
+    <string name="package_name">jp.shogi.trainer</string>
+    <string name="custom_url_scheme">jp.shogi.trainer</string>
+</resources>

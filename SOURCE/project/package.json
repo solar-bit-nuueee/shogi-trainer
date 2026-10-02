@@ -1,0 +1,24 @@
+{
+  "name": "speaki-shogi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "スピキ将棋 — 二択でおぼえる将棋 (SFEN/USI two-choice trainer, PWA + Capacitor)",
+  "type": "module",
+  "scripts": {
+    "serve": "node serve.mjs 5178",
+    "assets": "node tools/build-assets.mjs",
+    "problems": "node tools/convert-problems.mjs",
+    "web:build": "node tools/convert-problems.mjs && node tools/build-web.mjs",
+    "android:sync": "node tools/convert-problems.mjs && node tools/build-web.mjs && cap sync android",
+    "android": "node tools/convert-problems.mjs && node tools/build-web.mjs && cap sync android && cap open android",
+    "apk": "node tools/build-apk.mjs",
+    "apk:general": "node tools/build-apk.mjs --generic"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.2"
+  }
+}

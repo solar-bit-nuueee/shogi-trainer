@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#4a3b52" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>将棋トレーナー — 二択でおぼえる将棋</title>
+    <script>
+      // If the page isn't cross-origin isolated yet (needed by the analysis
+      // engine's WASM threads), reload once — by then the native/SW/​server
+      // COOP/COEP headers are in place. Guarded so it never loops.
+      if (!self.crossOriginIsolated && !sessionStorage.getItem('coiReload')) {
+        sessionStorage.setItem('coiReload', '1')
+        location.reload()
+      }
+    </script>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="" />
+    <link rel="stylesheet" href="styles/app.css" />
+  </head>
+  <body class="generic-build">
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">♟ 将棋トレーナー</div>
+        <div class="streak" title="連続学習日数">🔥 <span id="streak">0</span></div>
+        <button id="btn-settings" class="icon-btn" aria-label="設定">⚙</button>
+      </header>
+
+      <main>
+        <!-- ============ HOME ============ -->
+        <section id="screen-home" class="screen">
+          <div class="portrait-wrap">
+            <img id="portrait-home" class="portrait is-idle" alt="" />
+          </div>
+          <p class="tagline">局面問題でサクッと将棋をおぼえよう！</p>
+
+          <div class="stats-grid">
+            <div class="stat"><span class="stat-num" id="stat-due">0</span><span class="stat-lbl">復習</span></div>
+            <div class="stat"><span class="stat-num" id="stat-new">0</span><span class="stat-lbl">新しい</span></div>
+            <div class="stat"><span class="stat-num" id="stat-learned">0/0</span><span class="stat-lbl">習得</span></div>
+            <div class="stat"><span class="stat-num" id="stat-acc">—</span><span class="stat-lbl">正解率</span></div>
+          </div>
+
+          <div class="set-card">
+            <div><span class="set-card-label">問題セット</span><b id="home-set-name">標準問題</b></div>
+            <button id="btn-sets" class="mini-btn">管理・切替</button>
+          </div>
+
+          <button id="btn-start" class="primary-btn">今日の問題</button>
+          <button id="btn-practice" class="secondary-btn">れんしゅう（<span id="practice-n">10</span>問）を何度でも</button>
+          <p id="home-hint" class="hint"></p>
+        </section>
+
+        <!-- ============ QUIZ ============ -->
+        <section id="screen-quiz" class="screen hidden">
+          <div class="quiz-progress">
+            <div class="bar"><div id="quiz-bar"></div></div>
+            <span id="quiz-count" class="count">0 / 0</span>
+          </div>
+
+          <div class="qcard">
+            <div class="qtop">
+              <img id="portrait-quiz" class="mini-portrait is-idle" alt="" />
+              <div class="qmeta">
+                <span id="q-theme" class="qcat"></span>
+                <span id="q-turn" class="qturn"></span>
+              </div>
+              <div id="speech" class="speech hidden"></div>
+            </div>
+
+            <div id="hand-gote" class="hand hand-gote"></div>
+            <div id="board" class="board"></div>
+            <div id="hand-sente" class="hand hand-sente"></div>
+
+            <div id="q-prompt" class="q-prompt">正しい手はどっち？</div>
+            <button id="tsume-giveup" class="danger-btn tsume-giveup hidden">詰みなし／あきらめる</button>
+            <div class="choices">
+              <button class="choice" data-i="0">
+                <span class="cnum">1</span><span class="cmove"></span>
+              </button>
+              <button class="choice" data-i="1">
+                <span class="cnum">2</span><span class="cmove"></span>
+              </button>
+            </div>
+            <div id="explain" class="explain hidden"></div>
+            <div id="grade-row" class="grade-row hidden"></div>
+          </div>
+
+          <button id="btn-quit" class="text-btn">やめる</button>
+        </section>
+
+        <!-- ============ DONE ============ -->
+        <section id="screen-done" class="screen hidden">
+          <div class="portrait-wrap">
+            <img id="portrait-done" class="portrait is-happy" alt="" />
+          </div>
+          <h2 class="done-title">おつかれさま！</h2>
+          <div id="done-summary" class="done-summary"></div>
+          <p class="result-hint">まちがえた問題は、盤を動かして「なぜそうなるか」を確かめよう👇</p>
+          <div id="result-list" class="result-list"></div>
+          <button id="btn-home" class="primary-btn">ホームへもどる</button>
+        </section>
+
+        <!-- ============ ANALYSIS (検討) ============ -->
+        <section id="screen-analysis" class="screen hidden">
+          <div class="an-top">
+            <button id="an-back" class="icon-btn" aria-label="戻る">←</button>
+            <div class="an-title" id="an-title">検討</div>
+          </div>
+          <div id="an-hand-gote" class="hand hand-gote"></div>
+          <div id="an-board" class="board an-board"></div>
+          <div id="an-hand-sente" class="hand hand-sente"></div>
+
+          <div class="an-controls">
+            <button id="an-first" class="an-ctrl" title="最初へ">⏮</button>
+            <button id="an-prev" class="an-ctrl" title="一手戻る">◀</button>
+            <button id="an-next" class="an-ctrl" title="一手進む">▶</button>
+            <button id="an-reset" class="an-ctrl wide">最初の局面</button>
+          </div>
+
+          <button id="an-add-question" class="secondary-btn an-add-btn">この局面を問題に追加</button>
+          <p id="an-add-status" class="an-add-status"></p>
+          <div id="an-line-capture" class="an-line-capture hidden">
+            <b id="an-line-summary">手順を記録中</b>
+            <p>自分と相手の手を交互に指し、最後は自分の正解手で終えてください。</p>
+            <div class="an-line-actions">
+              <button id="an-line-undo" class="mini-btn">1手戻す</button>
+              <button id="an-line-cancel" class="danger-btn">中止</button>
+              <button id="an-line-finish" class="primary-btn">この手順で保存</button>
+            </div>
+          </div>
+
+          <div class="an-engine">
+            <div class="an-eval" id="an-eval">—</div>
+            <div class="an-best" id="an-best"></div>
+            <div class="an-pv" id="an-pv"></div>
+          </div>
+
+          <div class="an-moves" id="an-moves"></div>
+        </section>
+      </main>
+
+      <!-- ============ SETTINGS ============ -->
+      <div id="settings" class="modal hidden">
+        <div class="modal-card">
+          <div class="modal-head">
+            <h3>設定</h3>
+            <button id="btn-settings-close" class="icon-btn" aria-label="閉じる">✕</button>
+          </div>
+
+          <label class="field">
+            <span>1日の新しい問題数（今日の問題）：<b id="set-newperday-val">12</b></span>
+            <input id="set-newperday" type="range" min="0" max="40" step="1" />
+          </label>
+
+          <label class="field">
+            <span>れんしゅう1セットの問題数：<b id="set-setsize-val">10</b></span>
+            <input id="set-setsize" type="range" min="5" max="30" step="1" />
+          </label>
+
+          <label class="field row">
+            <span>効果音を消す</span>
+            <input id="set-mute" type="checkbox" />
+          </label>
+
+          <label class="field">
+            <span>効果音の音量</span>
+            <input id="set-volume" type="range" min="0" max="100" step="1" />
+          </label>
+
+          <label class="field row">
+            <span>BGMを再生</span>
+            <input id="set-bgm" type="checkbox" />
+          </label>
+
+          <label class="field">
+            <span>BGMの音量</span>
+            <input id="set-bgm-volume" type="range" min="0" max="100" step="1" />
+          </label>
+
+          <label class="field compact">
+            <span>端末のBGMファイル（複数選択可・オフライン対応）</span>
+            <input id="set-bgm-files" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus" multiple />
+          </label>
+          <ul id="set-bgm-file-list" class="bgm-file-list"></ul>
+
+          <label class="field compact">
+            <span>音源URL（MP3 / OGG / M4A の直リンク）</span>
+            <input id="set-bgm-url" type="url" inputmode="url" placeholder="https://.../bgm.mp3" autocomplete="off" />
+          </label>
+          <p id="set-bgm-status" class="bgm-status">曲が終わると、登録したファイルから次の曲をランダム再生します。</p>
+
+          <button id="btn-reset" class="danger-btn">学習記録をリセット</button>
+          <p class="fineprint">記録はこの端末のブラウザに保存されます。</p>
+          <p class="fineprint">解析エンジンと評価データはGPLv3です。再配布時は対応するソースコードも提供してください。<a href="licenses/GPL-3.0.txt" target="_blank" rel="noopener">GPLv3ライセンス</a></p>
+        </div>
+      </div>
+
+      <!-- ============ QUESTION SETS ============ -->
+      <div id="sets-modal" class="modal hidden">
+        <div class="modal-card set-modal-card">
+          <div class="modal-head">
+            <h3>問題セット</h3>
+            <button id="sets-close" class="icon-btn" aria-label="閉じる">✕</button>
+          </div>
+
+          <label class="field compact">
+            <span>使うセット</span>
+            <select id="sets-select"></select>
+          </label>
+          <p id="sets-info" class="set-info"></p>
+
+          <details class="set-create">
+            <summary>新しい問題セットを作る</summary>
+            <label class="field compact"><span>セット名</span><input id="set-new-name" type="text" maxlength="40" placeholder="例：終盤の手筋" /></label>
+            <label class="field compact"><span>回答形式</span>
+              <select id="set-new-type">
+                <option value="move">盤上で指して解答</option>
+                <option value="line">手順を指して解答</option>
+                <option value="tsume">詰将棋</option>
+                <option value="choice">二択</option>
+              </select>
+            </label>
+            <button id="set-create-btn" class="secondary-btn small-btn">作成</button>
+          </details>
+
+          <div id="set-editor" class="set-editor hidden">
+            <div id="set-manual-area">
+              <h4>SFENから問題を追加</h4>
+              <label class="field compact"><span>SFEN</span><textarea id="set-q-sfen" rows="3" placeholder="sfenの後ろの局面文字列"></textarea></label>
+              <label id="set-q-correct-field" class="field compact"><span>正解手（USI）</span><input id="set-q-correct" type="text" placeholder="例：7g7f" /></label>
+              <label id="set-q-wrong-field" class="field compact"><span>不正解手（USI）</span><input id="set-q-wrong" type="text" placeholder="例：2g2f" /></label>
+              <button id="set-q-add" class="secondary-btn small-btn">1問追加</button>
+            </div>
+
+            <p id="set-line-help" class="set-info hidden">この形式は解析画面の「この局面を問題に追加」から作成できます。</p>
+
+            <div id="set-import-area" class="set-import hidden">
+              <h4>自動生成TXTを取り込む</h4>
+              <input id="set-import-file" type="file" accept=".txt,text/plain" />
+              <button id="set-import-btn" class="secondary-btn small-btn">TXTを追加</button>
+            </div>
+
+            <p id="set-status" class="set-status"></p>
+            <button id="set-delete-btn" class="danger-btn">この問題セットを削除</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- choose the destination set before capturing an answer on the board -->
+      <div id="an-add-dialog" class="modal hidden">
+        <div class="modal-card promo-card">
+          <h3>追加先を選ぶ</h3>
+          <label id="an-add-existing-wrap" class="field compact"><select id="an-add-set-select"></select></label>
+          <button id="an-add-new-set-toggle" class="text-btn" type="button">＋ 新しい問題セットを作る</button>
+          <div id="an-add-new-set-form" class="hidden">
+            <label class="field compact">
+              <span>セット名</span>
+              <input id="an-add-new-set-name" type="text" maxlength="40" placeholder="例：終盤の手筋" />
+            </label>
+            <label class="field compact">
+              <span>回答形式</span>
+              <select id="an-add-new-set-type">
+                <option value="move">盤上で指して解答</option>
+                <option value="line">手順を指して解答</option>
+                <option value="tsume">詰将棋</option>
+              </select>
+            </label>
+            <p id="an-add-new-set-status" class="set-status"></p>
+            <button id="an-add-new-set-create" class="secondary-btn small-btn" type="button">作成して追加先に選ぶ</button>
+          </div>
+          <div class="promo-row">
+            <button id="an-add-cancel" class="danger-btn">やめる</button>
+            <button id="an-add-begin" class="primary-btn">正解手を指定</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- promotion dialog -->
+      <div id="promo-dialog" class="modal hidden">
+        <div class="modal-card promo-card">
+          <h3>成りますか？</h3>
+          <div class="promo-row">
+            <button id="promo-yes" class="primary-btn">成る</button>
+            <button id="promo-no" class="danger-btn">成らず</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="quiz-promo-dialog" class="modal hidden">
+        <div class="modal-card promo-card">
+          <h3>成りますか？</h3>
+          <div class="promo-row">
+            <button id="quiz-promo-yes" class="primary-btn">成る</button>
+            <button id="quiz-promo-no" class="danger-btn">成らず</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+    <script>
+      // Register the service worker for offline use + cross-origin isolation
+      // (the analysis engine needs SharedArrayBuffer). On hosts without COOP/COEP
+      // headers the SW supplies them; we then reload once to gain isolation.
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}))
+      }
+    </script>
+  </body>
+</html>

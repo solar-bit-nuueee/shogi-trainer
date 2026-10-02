@@ -1,0 +1,12 @@
+{
+  "name": "将棋トレーナー — 二択でおぼえる将棋",
+  "short_name": "将棋トレーナー",
+  "description": "二択問題で将棋を学ぶトレーニングアプリ。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7efe6",
+  "theme_color": "#4a3b52",
+  "lang": "ja"
+}
